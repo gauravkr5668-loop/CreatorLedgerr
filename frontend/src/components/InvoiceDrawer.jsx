@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SeverityBadge } from "@/components/SeverityBadge";
+import { ConfidenceRing } from "@/components/ConfidenceRing";
+import { AnomalyIcon } from "@/components/AnomalyIcon";
 import { CheckCircle2, XCircle, Sparkles, Edit3, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 
 export default function InvoiceDrawer({ invoice, onClose, onChanged }) {
     const open = Boolean(invoice);
@@ -77,47 +80,60 @@ export default function InvoiceDrawer({ invoice, onClose, onChanged }) {
             >
                 <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
                     <SheetHeader className="space-y-1">
-                        <div className="flex items-center justify-between">
-                            <div>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
                                 <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-700">
                                     Invoice review
                                 </div>
-                                <SheetTitle className="font-display text-2xl font-semibold tracking-tight">
-                                    {draft.creator_name || "Unknown creator"} · {draft.invoice_number}
+                                <SheetTitle className="font-display text-2xl font-semibold tracking-tight truncate">
+                                    {draft.creator_name || "Unknown creator"}
                                 </SheetTitle>
+                                <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                                    <span className="font-mono">{draft.invoice_number || "—"}</span>
+                                    <span>·</span>
+                                    <span className="truncate">{draft.campaign_reference || "no campaign"}</span>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
-                                <Sparkles className="w-3.5 h-3.5" />
-                                {Math.round((draft.confidence_score || 0) * 100)}% confidence
-                            </div>
+                            <ConfidenceRing value={draft.confidence_score} label="AI" size={56} />
                         </div>
                     </SheetHeader>
 
                     {/* Anomalies */}
                     {draft.discrepancies?.length > 0 && (
                         <div className="space-y-2">
-                            <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">AI flagged</div>
+                            <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500 flex items-center gap-2">
+                                <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+                                AI flagged · {draft.discrepancies.length}
+                            </div>
                             <div className="space-y-2">
                                 {draft.discrepancies.map((d, i) => (
-                                    <div
+                                    <motion.div
                                         key={i}
+                                        initial={{ opacity: 0, y: 4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.25, delay: i * 0.04 }}
                                         data-testid={`anomaly-${i}`}
-                                        className="rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50/40 to-white p-4"
+                                        className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/40 p-4 hover:border-slate-300 transition-colors"
                                     >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="font-medium text-slate-900">{d.label}</div>
-                                            <SeverityBadge severity={d.severity} />
+                                        <div className="flex items-start gap-3">
+                                            <AnomalyIcon code={d.code} severity={d.severity} />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="font-medium text-slate-900">{d.label}</div>
+                                                    <SeverityBadge severity={d.severity} />
+                                                </div>
+                                                <p className="mt-1.5 text-sm text-slate-700 leading-relaxed">{d.reason}</p>
+                                                <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                                                    {d.expected && <span>Expected: <span className="font-medium text-slate-700">{d.expected}</span></span>}
+                                                    {d.actual && <span>Actual: <span className="font-medium text-slate-700">{d.actual}</span></span>}
+                                                    {d.confidence ? <span>Confidence: <span className="font-medium text-slate-700">{Math.round(d.confidence * 100)}%</span></span> : null}
+                                                </div>
+                                                {d.suggestion && (
+                                                    <p className="mt-2 text-xs italic text-emerald-700">→ {d.suggestion}</p>
+                                                )}
+                                            </div>
                                         </div>
-                                        <p className="mt-2 text-sm text-slate-700 leading-relaxed">{d.reason}</p>
-                                        <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
-                                            {d.expected && <span>Expected: <span className="font-medium text-slate-700">{d.expected}</span></span>}
-                                            {d.actual && <span>Actual: <span className="font-medium text-slate-700">{d.actual}</span></span>}
-                                            {d.confidence ? <span>Confidence: <span className="font-medium text-slate-700">{Math.round(d.confidence * 100)}%</span></span> : null}
-                                        </div>
-                                        {d.suggestion && (
-                                            <p className="mt-2 text-xs italic text-emerald-700">Suggestion: {d.suggestion}</p>
-                                        )}
-                                    </div>
+                                    </motion.div>
                                 ))}
                             </div>
                         </div>

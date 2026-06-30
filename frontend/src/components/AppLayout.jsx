@@ -53,7 +53,11 @@ function Sidebar() {
                             {({ isActive }) => (
                                 <>
                                     {isActive && (
-                                        <span className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-emerald-600" />
+                                        <motion.span
+                                            layoutId="active-nav-indicator"
+                                            className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-emerald-600"
+                                            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                                        />
                                     )}
                                     <Icon className="w-4 h-4" strokeWidth={1.75} />
                                     {label}
@@ -81,6 +85,19 @@ function TopBar() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [q, setQ] = useState("");
+    const searchRef = React.useRef(null);
+
+    React.useEffect(() => {
+        const onKey = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+                e.preventDefault();
+                searchRef.current?.focus();
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
+
     return (
         <header className="sticky top-0 z-40 glass-strong border-b border-slate-200/60">
             <div className="flex items-center gap-4 px-4 sm:px-6 h-16">
@@ -90,6 +107,7 @@ function TopBar() {
                 <div className="flex-1 max-w-xl relative hidden md:block">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={1.75} />
                     <Input
+                        ref={searchRef}
                         data-testid="global-search-input"
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
@@ -99,8 +117,11 @@ function TopBar() {
                             }
                         }}
                         placeholder="Search creators, campaigns, PAN, invoice #…"
-                        className="pl-9 h-10 rounded-xl bg-white border-slate-200/70 focus:ring-2 focus:ring-emerald-700/15 focus:border-emerald-700/40"
+                        className="pl-9 pr-14 h-10 rounded-xl bg-white border-slate-200/70 focus:ring-2 focus:ring-emerald-700/15 focus:border-emerald-700/40"
                     />
+                    <kbd className="hidden lg:inline-flex items-center justify-center absolute right-2 top-1/2 -translate-y-1/2 h-6 px-1.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200/70 font-mono">
+                        ⌘K
+                    </kbd>
                 </div>
                 <div className="ml-auto flex items-center gap-3">
                     <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
@@ -179,10 +200,15 @@ export default function AppLayout() {
                 <MobileNav />
                 <main className="flex-1 px-4 sm:px-8 py-6 sm:py-10">
                     <div className="max-w-7xl mx-auto">
-                        <Outlet />
+                        <PageTransition>
+                            <Outlet />
+                        </PageTransition>
                     </div>
                 </main>
             </div>
         </div>
+    );
+}
+/div>
     );
 }

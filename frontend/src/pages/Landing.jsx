@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
 import { SeverityBadge } from "@/components/SeverityBadge";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import {
     ArrowRight, Sparkles, ShieldCheck, FileText, Upload, ClipboardCheck,
     Banknote, AlertTriangle, IdCard, Copy, CheckCircle2, ChevronDown,
@@ -186,19 +187,33 @@ function HeroPreview() {
 
 function Stats() {
     const stats = [
-        { v: "94%", l: "less time spent on payout prep" },
-        { v: "12s", l: "average per-invoice extraction" },
-        { v: "11", l: "issue types detected automatically" },
-        { v: "₹2.4 Cr", l: "reconciled in the demo dataset" },
+        { suffix: "%", value: 94, l: "less time spent on payout prep" },
+        { suffix: "s", value: 12, prefix: "<", l: "average per-invoice extraction" },
+        { suffix: "", value: 11, l: "issue types detected automatically" },
+        { custom: "₹2.4 Cr", l: "reconciled in the demo dataset" },
     ];
     return (
         <section className="border-y border-slate-200/70 bg-white/60">
             <div className="max-w-7xl mx-auto px-5 sm:px-8 py-10 grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-8">
-                {stats.map((s) => (
-                    <div key={s.l}>
-                        <div className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">{s.v}</div>
+                {stats.map((s, i) => (
+                    <motion.div
+                        key={s.l}
+                        initial={{ opacity: 0, y: 12 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.5, delay: i * 0.06 }}
+                    >
+                        <div className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">
+                            {s.custom ? s.custom : (
+                                <>
+                                    {s.prefix || ""}
+                                    <AnimatedNumber value={s.value} duration={1500} />
+                                    {s.suffix}
+                                </>
+                            )}
+                        </div>
                         <div className="mt-1 text-xs sm:text-sm text-slate-500">{s.l}</div>
-                    </div>
+                    </motion.div>
                 ))}
             </div>
         </section>

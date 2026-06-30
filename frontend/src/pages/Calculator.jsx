@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { formatINR } from "@/lib/format";
 import { motion } from "framer-motion";
 import { Calculator as CalculatorIcon, Loader2, Save } from "lucide-react";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -146,7 +147,13 @@ export default function Calculator() {
                     </div>
                     <div className="mt-5 rounded-xl bg-emerald-700 text-white p-4 flex items-center justify-between">
                         <div className="text-sm font-medium opacity-90">Net payable to creator</div>
-                        <div data-testid="preview-net-payable" className="font-display text-2xl font-semibold tracking-tight">{formatINR(net)}</div>
+                        <div data-testid="preview-net-payable" className="font-display text-2xl font-semibold tracking-tight">
+                            <AnimatedNumber
+                                value={net}
+                                duration={500}
+                                format={(v) => formatINR(v)}
+                            />
+                        </div>
                     </div>
                 </motion.div>
             </div>

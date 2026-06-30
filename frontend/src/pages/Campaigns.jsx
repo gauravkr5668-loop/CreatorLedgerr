@@ -160,13 +160,17 @@ export default function Campaigns() {
                             <div className="col-span-12 h-6 shimmer rounded-md" />
                         </div>
                     )) : rows.length === 0 ? (
-                        <div className="p-10 text-center">
-                            <div className="mx-auto w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
-                                <FolderKanban className="w-5 h-5 text-slate-400" />
-                            </div>
-                            <p className="mt-3 text-sm text-slate-600 font-medium">No campaigns yet</p>
-                            <p className="text-xs text-slate-400">Upload your master sheet or add one manually.</p>
-                        </div>
+                        <EmptyState
+                            icon={FolderKanban}
+                            title="No campaigns yet"
+                            body="Upload your master sheet (Excel or CSV) or add the first campaign manually. Reconciliation runs against this list."
+                            className="border-0"
+                            action={
+                                <Button onClick={() => fileRef.current?.click()} data-testid="campaigns-empty-upload" className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white">
+                                    <FileSpreadsheet className="w-4 h-4 mr-2" /> Upload Excel
+                                </Button>
+                            }
+                        />
                     ) : rows.map((c, i) => (
                         <motion.div
                             key={c.id}

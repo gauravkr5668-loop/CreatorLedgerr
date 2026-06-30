@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { motion } from "framer-motion";
-import { Sparkles, AlertTriangle, Banknote, ShieldCheck, TrendingUp, Copy, IdCard, RefreshCw, Loader2 } from "lucide-react";
+import { Sparkles, AlertTriangle, Banknote, ShieldCheck, TrendingUp, Copy, IdCard, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SeverityBadge } from "@/components/SeverityBadge";
+import { EmptyState } from "@/components/EmptyState";
 import { toast } from "sonner";
 
 const ICONS = {
@@ -73,13 +74,11 @@ export default function Insights() {
                     {Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl border border-slate-200 bg-white h-44 shimmer" />)}
                 </div>
             ) : insights.length === 0 ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
-                    <div className="mx-auto w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                        <Sparkles className="w-6 h-6 text-emerald-700" />
-                    </div>
-                    <h3 className="mt-4 font-display text-xl font-medium text-slate-900">No insights yet</h3>
-                    <p className="mt-1 text-sm text-slate-500">Upload your campaign sheet and a few invoices, then come back.</p>
-                </div>
+                <EmptyState
+                    icon={Sparkles}
+                    title="No insights yet"
+                    body="Upload your campaign sheet and a few invoices, then come back. CreatorLedger will surface what changed and what needs your attention."
+                />
             ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {insights.map((c, i) => {

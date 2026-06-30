@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { api, API_BASE } from "@/lib/api";
+import { api } from "@/lib/api";
 import { formatINR } from "@/lib/format";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
+import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import {
     Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
-import { Download, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { Download, Inbox, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ExportPage() {
@@ -77,7 +79,7 @@ export default function ExportPage() {
             </div>
 
             <div className="grid sm:grid-cols-3 gap-3">
-                <Stat label="Invoices in export" value={loading ? "—" : rows.length} />
+                <Stat label="Invoices in export" value={loading ? "—" : <AnimatedNumber value={rows.length} />} />
                 <Stat label="Gross total" value={loading ? "—" : formatINR(total)} accent="emerald" />
                 <Stat label="Filter" value={loading ? "—" : status} />
             </div>
@@ -105,7 +107,14 @@ export default function ExportPage() {
                     <div key={i} className="grid grid-cols-12 px-4 py-3 border-b border-slate-100">
                         <div className="col-span-12 h-6 shimmer rounded-md" />
                     </div>
-                )) : rows.map((r, i) => {
+                )) : rows.length === 0 ? (
+                    <EmptyState
+                        icon={Inbox}
+                        title="Nothing to export here"
+                        body="Approve some invoices in Reconciliation or pick a different filter to see rows."
+                        className="border-0"
+                    />
+                ) : rows.map((r, i) => {
                     const gross = Number(r.gross_amount || 0);
                     const gst = (gross * (settings?.gst_rate || 0)) / 100;
                     const tds = (gross * (settings?.tds_rate || 0)) / 100;

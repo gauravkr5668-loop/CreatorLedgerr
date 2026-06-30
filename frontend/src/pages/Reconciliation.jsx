@@ -3,9 +3,11 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { formatINR } from "@/lib/format";
 import { motion } from "framer-motion";
-import { Sparkles, AlertTriangle, CheckCircle2, XCircle, RefreshCw, Loader2 } from "lucide-react";
+import { CheckCircle2, RefreshCw, Loader2, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SeverityBadge } from "@/components/SeverityBadge";
+import { AnomalyIcon } from "@/components/AnomalyIcon";
+import { EmptyState } from "@/components/EmptyState";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import InvoiceDrawer from "@/components/InvoiceDrawer";
@@ -97,7 +99,7 @@ export default function Reconciliation() {
                             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-white border border-slate-200 p-6 h-40 shimmer" />)}
                         </div>
                     ) : filtered.length === 0 ? (
-                        <EmptyState />
+                        <EmptyStateInline />
                     ) : (
                         <div className="grid lg:grid-cols-2 gap-4">
                             {filtered.map((inv, i) => (
@@ -126,16 +128,21 @@ export default function Reconciliation() {
 
                                     <div className="mt-4 space-y-2">
                                         {inv.discrepancies.slice(0, 2).map((d, di) => (
-                                            <div key={di} className="rounded-xl bg-gradient-to-br from-emerald-50/50 to-white border border-slate-200/80 p-3">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="font-medium text-sm text-slate-900">{d.label}</div>
-                                                    <SeverityBadge severity={d.severity} />
+                                            <div key={di} className="rounded-xl bg-slate-50/60 border border-slate-200/70 p-3">
+                                                <div className="flex items-start gap-2.5">
+                                                    <AnomalyIcon code={d.code} severity={d.severity} className="w-7 h-7" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <div className="font-medium text-sm text-slate-900 truncate">{d.label}</div>
+                                                            <SeverityBadge severity={d.severity} />
+                                                        </div>
+                                                        <div className="mt-1 text-xs text-slate-600 leading-relaxed line-clamp-2">{d.reason}</div>
+                                                    </div>
                                                 </div>
-                                                <div className="mt-1 text-xs text-slate-600 leading-relaxed">{d.reason}</div>
                                             </div>
                                         ))}
                                         {inv.discrepancies.length > 2 && (
-                                            <div className="text-[11px] font-semibold text-slate-500">+ {inv.discrepancies.length - 2} more issue{inv.discrepancies.length - 2 > 1 ? "s" : ""}</div>
+                                            <div className="text-[11px] font-semibold text-slate-500 px-1">+ {inv.discrepancies.length - 2} more issue{inv.discrepancies.length - 2 > 1 ? "s" : ""}</div>
                                         )}
                                     </div>
 
@@ -162,14 +169,12 @@ export default function Reconciliation() {
     );
 }
 
-function EmptyState() {
+function EmptyStateInline() {
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                <CheckCircle2 className="w-7 h-7 text-emerald-700" />
-            </div>
-            <h3 className="mt-4 font-display text-xl font-medium text-slate-900">All clear in this slice</h3>
-            <p className="mt-1 text-sm text-slate-500">No invoices match this severity filter.</p>
-        </div>
+        <EmptyState
+            icon={CheckCircle2}
+            title="All clear in this slice"
+            body="No invoices match this severity filter. Try switching tabs or re-run reconciliation."
+        />
     );
 }

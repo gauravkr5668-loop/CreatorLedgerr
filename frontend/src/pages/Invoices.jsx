@@ -1,33 +1,32 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { formatINR, formatDate } from "@/lib/format";
 import { motion } from "framer-motion";
 import {
-    Upload, Search, FileText, Sparkles, Filter, Loader2, X, CheckCircle2,
+    Upload, Search, FileText, X, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SeverityBadge } from "@/components/SeverityBadge";
+import { EmptyState } from "@/components/EmptyState";
+import { UploadModal } from "@/components/UploadModal";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
 import InvoiceDrawer from "@/components/InvoiceDrawer";
 
 export default function Invoices() {
     const [params, setParams] = useSearchParams();
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [uploading, setUploading] = useState(false);
+    const [uploadOpen, setUploadOpen] = useState(false);
     const [filter, setFilter] = useState({
         q: params.get("q") || "",
         status: params.get("status") || "all",
         severity: params.get("severity") || "all",
     });
     const [openInvoice, setOpenInvoice] = useState(null);
-    const fileRef = useRef(null);
-    const navigate = useNavigate();
 
     const load = async () => {
         setLoading(true);
@@ -41,41 +40,12 @@ export default function Invoices() {
 
     useEffect(() => {
         load();
-        // sync params
         const next = new URLSearchParams();
         if (filter.q) next.set("q", filter.q);
         if (filter.status !== "all") next.set("status", filter.status);
         if (filter.severity !== "all") next.set("severity", filter.severity);
         setParams(next, { replace: true });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filter.q, filter.status, filter.severity]);
-
-    const onUpload = async (e) => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length) return;
-        const fd = new FormData();
-        for (const f of files) fd.append("files", f);
-        setUploading(true);
-        const t = toast.loading(`Extracting ${files.length} invoice${files.length > 1 ? "s" : ""} with AI…`);
-        try {
-            const { data } = await api.post("/invoices/upload", fd, {
-                headers: { "Content-Type": "multipart/form-data" },
-                timeout: 180000,
-            });
-            const ok = data.results.filter((r) => r.ok).length;
-            const fail = data.results.filter((r) => !r.ok).length;
-            toast.dismiss(t);
-            if (ok) toast.success(`${ok} invoice${ok > 1 ? "s" : ""} extracted & reconciled`);
-            if (fail) toast.error(`${fail} file${fail > 1 ? "s" : ""} failed`);
-            await load();
-        } catch (err) {
-            toast.dismiss(t);
-            toast.error(err.response?.data?.detail || "Upload failed");
-        } finally {
-            setUploading(false);
-            if (fileRef.current) fileRef.current.value = "";
-        }
-    };
+    }, [filter.q, filter.status, filter.severity]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const counts = useMemo(() => ({
         total: rows.length,
@@ -97,23 +67,13 @@ export default function Invoices() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <input
-                        ref={fileRef}
-                        type="file"
-                        accept="application/pdf,image/png,image/jpeg"
-                        multiple
-                        className="hidden"
-                        onChange={onUpload}
-                        data-testid="invoice-upload-input"
-                    />
                     <Button
                         type="button"
-                        onClick={() => fileRef.current?.click()}
-                        disabled={uploading}
+                        onClick={() => setUploadOpen(true)}
                         data-testid="invoice-upload-btn"
-                        className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white"
+                        className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm"
                     >
-                        {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+                        <Upload className="w-4 h-4 mr-2" />
                         Bulk upload
                     </Button>
                 </div>
@@ -202,46 +162,92 @@ export default function Invoices() {
                         <div className="col-span-12 h-6 shimmer rounded-md" />
                     </div>
                 )) : rows.length === 0 ? (
-                    <div className="p-12 text-center">
-                        <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
-                            <FileText className="w-6 h-6 text-slate-400" />
+                    <EmptyState
+                        icon={FileText}
+                        title="No invoices yet"
+                        body="Drop your first PDF or image and watch CreatorLedger extract every field, reconcile it against your campaign sheet and flag the issues automatically."
+                        action={
+                            <Button onClick={() => setUploadOpen(true)} data-testid="invoice-empty-upload" className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white">
+                                <Upload className="w-4 h-4 mr-2" /> Upload your first invoice
+                            </Button>
+                        }
+                        className="border-0"
+                    />
+                ) : (
+                    <>
+                        {/* Desktop rows */}
+                        <div className="hidden md:block">
+                            {rows.map((inv, i) => (
+                                <motion.button
+                                    type="button"
+                                    key={inv.id}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ duration: 0.2, delay: Math.min(i * 0.01, 0.25) }}
+                                    onClick={() => setOpenInvoice(inv)}
+                                    data-testid={`invoice-row-${i}`}
+                                    className="w-full text-left grid grid-cols-12 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/70 transition-colors items-center"
+                                >
+                                    <div className="col-span-3 min-w-0">
+                                        <div className="font-medium text-slate-900 truncate">{inv.creator_name || "Unknown creator"}</div>
+                                    </div>
+                                    <div className="col-span-2 font-mono text-xs text-slate-700 truncate">{inv.invoice_number}</div>
+                                    <div className="col-span-2 text-sm text-slate-600 truncate">{inv.campaign_reference}</div>
+                                    <div className="col-span-1 text-xs text-slate-500">{formatDate(inv.invoice_date)}</div>
+                                    <div className="col-span-1 text-right text-sm font-semibold text-slate-900 tabular-nums">{formatINR(inv.gross_amount)}</div>
+                                    <div className="col-span-2 flex flex-wrap gap-1.5">
+                                        {inv.discrepancies?.length ? inv.discrepancies.slice(0, 2).map((d, di) => (
+                                            <SeverityBadge key={di} severity={d.severity}>{d.label}</SeverityBadge>
+                                        )) : <span className="text-[10px] text-emerald-700 inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Clean</span>}
+                                        {inv.discrepancies?.length > 2 && (
+                                            <span className="text-[10px] font-medium text-slate-500 rounded-full bg-slate-100 px-1.5 py-0.5">+{inv.discrepancies.length - 2}</span>
+                                        )}
+                                    </div>
+                                    <div className="col-span-1">
+                                        <StatusPill status={inv.status} />
+                                    </div>
+                                </motion.button>
+                            ))}
                         </div>
-                        <p className="mt-4 text-base font-medium text-slate-700">No invoices yet</p>
-                        <p className="text-sm text-slate-500">Drop your first PDF and watch CreatorLedger work.</p>
-                    </div>
-                ) : rows.map((inv, i) => (
-                    <motion.button
-                        type="button"
-                        key={inv.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.2, delay: Math.min(i * 0.012, 0.3) }}
-                        onClick={() => setOpenInvoice(inv)}
-                        data-testid={`invoice-row-${i}`}
-                        className="w-full text-left grid md:grid-cols-12 grid-cols-2 px-4 py-3 border-b border-slate-100 hover:bg-slate-50/70 transition-colors items-center gap-y-2"
-                    >
-                        <div className="md:col-span-3 col-span-2">
-                            <div className="font-medium text-slate-900 truncate">{inv.creator_name || "Unknown creator"}</div>
-                            <div className="text-xs text-slate-500 truncate md:hidden">{inv.invoice_number}</div>
+
+                        {/* Mobile cards */}
+                        <div className="md:hidden divide-y divide-slate-100">
+                            {rows.map((inv, i) => (
+                                <button
+                                    type="button"
+                                    key={inv.id}
+                                    onClick={() => setOpenInvoice(inv)}
+                                    data-testid={`invoice-card-${i}`}
+                                    className="w-full text-left p-4 hover:bg-slate-50/70 transition-colors"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-medium text-slate-900 truncate">{inv.creator_name || "Unknown"}</div>
+                                            <div className="text-xs text-slate-500 truncate mt-0.5 font-mono">{inv.invoice_number}</div>
+                                            <div className="text-xs text-slate-500 truncate mt-0.5">{inv.campaign_reference}</div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <div className="text-sm font-semibold text-slate-900 tabular-nums">{formatINR(inv.gross_amount)}</div>
+                                            <div className="mt-1"><StatusPill status={inv.status} /></div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-1.5">
+                                        {inv.discrepancies?.length ? inv.discrepancies.slice(0, 3).map((d, di) => (
+                                            <SeverityBadge key={di} severity={d.severity}>{d.label}</SeverityBadge>
+                                        )) : <span className="text-[10px] text-emerald-700 inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Clean</span>}
+                                    </div>
+                                </button>
+                            ))}
                         </div>
-                        <div className="hidden md:block md:col-span-2 font-mono text-xs text-slate-700">{inv.invoice_number}</div>
-                        <div className="hidden md:block md:col-span-2 text-sm text-slate-600 truncate">{inv.campaign_reference}</div>
-                        <div className="hidden md:block md:col-span-1 text-xs text-slate-500">{formatDate(inv.invoice_date)}</div>
-                        <div className="md:col-span-1 text-right text-sm font-semibold text-slate-900">{formatINR(inv.gross_amount)}</div>
-                        <div className="md:col-span-2 flex flex-wrap gap-1.5">
-                            {inv.discrepancies?.length ? inv.discrepancies.slice(0, 2).map((d, di) => (
-                                <SeverityBadge key={di} severity={d.severity}>{d.label}</SeverityBadge>
-                            )) : <span className="text-[10px] text-emerald-700 inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Clean</span>}
-                            {inv.discrepancies?.length > 2 && (
-                                <span className="text-[10px] font-medium text-slate-500 rounded-full bg-slate-100 px-1.5 py-0.5">+{inv.discrepancies.length - 2}</span>
-                            )}
-                        </div>
-                        <div className="md:col-span-1">
-                            <StatusPill status={inv.status} />
-                        </div>
-                    </motion.button>
-                ))}
+                    </>
+                )}
             </div>
+
+            <UploadModal
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
+                onComplete={load}
+            />
 
             <InvoiceDrawer
                 invoice={openInvoice}

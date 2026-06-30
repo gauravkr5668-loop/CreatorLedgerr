@@ -2,15 +2,16 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { formatINRCompact, formatINR } from "@/lib/format";
+import { formatINR, formatINRCompact, initials } from "@/lib/format";
 import { StatCard } from "@/components/StatCard";
 import { SeverityBadge } from "@/components/SeverityBadge";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
+import { EmptyState } from "@/components/EmptyState";
 import {
     FileText, Users, Banknote, AlertTriangle, ShieldCheck,
     Hourglass, CheckCircle2, ArrowRight, Sparkles, Wallet,
-    TrendingUp, AlertCircle, Copy, IdCard,
+    TrendingUp, Copy, IdCard,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 const insightIcons = {
     "alert-triangle": AlertTriangle,
@@ -92,14 +93,31 @@ export default function Dashboard() {
 
             {/* Stat bento grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <StatCard testId="stat-invoices-uploaded" label="Invoices uploaded" value={loading ? "—" : summary.invoices_uploaded} icon={FileText} />
-                <StatCard testId="stat-creators-processed" label="Creators processed" value={loading ? "—" : summary.creators_processed} icon={Users} />
-                <StatCard testId="stat-campaign-value" label="Campaign value" value={loading ? "—" : formatINRCompact(summary.total_campaign_value)} icon={Wallet} accent="emerald" />
-                <StatCard testId="stat-invoice-value" label="Invoiced this cycle" value={loading ? "—" : formatINRCompact(summary.total_invoice_value)} icon={TrendingUp} accent="emerald" />
-                <StatCard testId="stat-flagged-issues" label="Flagged issues" value={loading ? "—" : summary.flagged_issues} icon={AlertTriangle} accent="rose" sub={loading ? "" : `${summary.critical_issues} critical · ${summary.warning_issues} warning`} />
-                <StatCard testId="stat-approved" label="Approved payouts" value={loading ? "—" : summary.approved_payouts} icon={CheckCircle2} accent="emerald" />
-                <StatCard testId="stat-pending" label="Pending review" value={loading ? "—" : summary.pending_review} icon={Hourglass} accent="amber" />
-                <StatCard testId="stat-export-ready" label="Export-ready" value={loading ? "—" : summary.export_ready} icon={Banknote} accent="emerald" />
+                <StatCard testId="stat-invoices-uploaded" label="Invoices uploaded"
+                    value={loading ? "—" : <AnimatedNumber value={summary.invoices_uploaded} />}
+                    icon={FileText} />
+                <StatCard testId="stat-creators-processed" label="Creators processed"
+                    value={loading ? "—" : <AnimatedNumber value={summary.creators_processed} />}
+                    icon={Users} />
+                <StatCard testId="stat-campaign-value" label="Campaign value"
+                    value={loading ? "—" : formatINRCompact(summary.total_campaign_value)}
+                    icon={Wallet} accent="emerald" />
+                <StatCard testId="stat-invoice-value" label="Invoiced this cycle"
+                    value={loading ? "—" : formatINRCompact(summary.total_invoice_value)}
+                    icon={TrendingUp} accent="emerald" />
+                <StatCard testId="stat-flagged-issues" label="Flagged issues"
+                    value={loading ? "—" : <AnimatedNumber value={summary.flagged_issues} />}
+                    icon={AlertTriangle} accent="rose"
+                    sub={loading ? "" : `${summary.critical_issues} critical · ${summary.warning_issues} warning`} />
+                <StatCard testId="stat-approved" label="Approved payouts"
+                    value={loading ? "—" : <AnimatedNumber value={summary.approved_payouts} />}
+                    icon={CheckCircle2} accent="emerald" />
+                <StatCard testId="stat-pending" label="Pending review"
+                    value={loading ? "—" : <AnimatedNumber value={summary.pending_review} />}
+                    icon={Hourglass} accent="amber" />
+                <StatCard testId="stat-export-ready" label="Export-ready"
+                    value={loading ? "—" : <AnimatedNumber value={summary.export_ready} />}
+                    icon={Banknote} accent="emerald" />
             </div>
 
             {/* AI Insights + flagged list */}
@@ -158,20 +176,27 @@ export default function Dashboard() {
                                 <div key={i} className="p-4 h-16 shimmer" />
                             ))
                             : topInvoices.length === 0 ? (
-                                <div className="p-6 text-sm text-slate-500 text-center">No flagged invoices — great work!</div>
+                                <div className="p-8 text-center">
+                                    <CheckCircle2 className="mx-auto w-8 h-8 text-emerald-600" />
+                                    <p className="mt-2 text-sm text-slate-700 font-medium">All clear in this cycle</p>
+                                    <p className="text-xs text-slate-400">No invoices need attention right now.</p>
+                                </div>
                             ) : topInvoices.map((inv, i) => (
                                 <Link
                                     key={inv.id}
                                     to={`/reconciliation?focus=${inv.id}`}
                                     data-testid={`flagged-row-${i}`}
-                                    className="flex items-center justify-between gap-3 p-4 hover:bg-slate-50 transition-colors"
+                                    className="flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors group"
                                 >
-                                    <div className="min-w-0">
-                                        <div className="font-medium text-slate-900 truncate">{inv.creator_name || "—"}</div>
+                                    <span className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold flex items-center justify-center shrink-0 group-hover:bg-emerald-700 group-hover:text-white transition-colors">
+                                        {initials(inv.creator_name)}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-slate-900 truncate text-sm">{inv.creator_name || "—"}</div>
                                         <div className="text-xs text-slate-500 truncate">{inv.invoice_number} · {inv.campaign_reference}</div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-sm font-semibold text-slate-900">{formatINR(inv.gross_amount)}</div>
+                                    <div className="text-right shrink-0">
+                                        <div className="text-sm font-semibold text-slate-900 tabular-nums">{formatINR(inv.gross_amount)}</div>
                                         <div className="mt-1 flex justify-end">
                                             {inv.discrepancies?.length ? (
                                                 <SeverityBadge severity={inv.discrepancies[0].severity}>
