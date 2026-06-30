@@ -72,10 +72,10 @@ export default function InvoiceDrawer({ invoice, onClose, onChanged }) {
         <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
             <SheetContent
                 side="right"
-                className="w-full sm:max-w-2xl p-0 overflow-y-auto"
+                className="w-full sm:max-w-2xl p-0 flex flex-col h-full"
                 data-testid="invoice-drawer"
             >
-                <div className="p-6 sm:p-8 space-y-6">
+                <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
                     <SheetHeader className="space-y-1">
                         <div className="flex items-center justify-between">
                             <div>
@@ -192,31 +192,31 @@ export default function InvoiceDrawer({ invoice, onClose, onChanged }) {
                             </div>
                         )}
                     </div>
+                </div>
 
-                    {/* Footer actions */}
-                    <div className="sticky bottom-0 -mx-6 sm:-mx-8 px-6 sm:px-8 py-4 border-t border-slate-200 bg-white/90 backdrop-blur flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-sm text-slate-500">
-                            Net payable estimate: <span className="font-semibold text-slate-900">{formatINR((draft.gross_amount || 0) + (draft.gst_amount || 0))}</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                data-testid="drawer-reject-btn"
-                                onClick={() => setStatus("rejected")}
-                                disabled={actioning}
-                                className="rounded-xl border-slate-200 hover:bg-rose-50 hover:text-rose-700"
-                            >
-                                <XCircle className="w-4 h-4 mr-1.5" /> Reject
-                            </Button>
-                            <Button
-                                data-testid="drawer-approve-btn"
-                                onClick={() => setStatus("approved")}
-                                disabled={actioning}
-                                className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white"
-                            >
-                                <CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve
-                            </Button>
-                        </div>
+                {/* Footer actions — always visible, outside the scroll area */}
+                <div className="border-t border-slate-200 bg-white px-6 sm:px-8 py-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-sm text-slate-500">
+                        Net payable estimate: <span className="font-semibold text-slate-900">{formatINR((draft.gross_amount || 0) + (draft.gst_amount || 0))}</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            data-testid="drawer-reject-btn"
+                            onClick={() => setStatus("rejected")}
+                            disabled={actioning}
+                            className="rounded-xl border-slate-200 hover:bg-rose-50 hover:text-rose-700"
+                        >
+                            <XCircle className="w-4 h-4 mr-1.5" /> Reject
+                        </Button>
+                        <Button
+                            data-testid="drawer-approve-btn"
+                            onClick={() => setStatus("approved")}
+                            disabled={actioning}
+                            className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white"
+                        >
+                            <CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve
+                        </Button>
                     </div>
                 </div>
             </SheetContent>

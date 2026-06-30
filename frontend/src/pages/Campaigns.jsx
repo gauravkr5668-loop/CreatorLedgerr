@@ -109,6 +109,9 @@ export default function Campaigns() {
                         <DialogContent className="sm:max-w-md rounded-2xl">
                             <DialogHeader>
                                 <DialogTitle className="font-display">Add campaign</DialogTitle>
+                                <DialogDescription className="text-xs text-slate-500">
+                                    Add a row to your campaign master sheet so reconciliation can match this creator's invoices.
+                                </DialogDescription>
                             </DialogHeader>
                             <form onSubmit={submit} className="space-y-3">
                                 <div>
