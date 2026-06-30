@@ -1,0 +1,61 @@
+{
+  "summary": "End-to-end test of CreatorLedger. Backend: 25/25 pytest cases pass after fixing one bug (POST /api/campaigns returned 500 due to Mongo ObjectId leaking into response). Frontend: 11/13 Playwright flows pass — landing, login (email/password + Google demo), dashboard stats (41 invoices, 30 creators, 14 flagged shown correctly), campaigns (add new), invoices search/filter, reconciliation, insights, calculator, export, global search, signup-with-seed. Two real issues found: (a) Invoice drawer Approve button is below the visible viewport inside the drawer's non-scrolling layout; (b) the user-menu dropdown does NOT open when the trigger is clicked — the welcome toast appears to intercept pointer events on the trigger, blocking logout.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AppLayout / user menu",
+        "issue": "Clicking [data-testid=\"user-menu-trigger\"] does NOT open the Radix DropdownMenu (aria-expanded stays \"false\", no [role=menu] appears). Cause is almost certainly the success toast ('Welcome back to CreatorLedger') which appears in the top-right and overlays the trigger — even with playwright force-click the dropdown never opens. Consequence: users cannot reach the LOGOUT item (or the Settings item) until the toast disappears. Repro: log in → immediately click avatar in top-right → nothing happens.",
+        "selector": "[data-testid=\"user-menu-trigger\"]",
+        "priority": "HIGH"
+      },
+      {
+        "component": "InvoiceDrawer",
+        "issue": "drawer-approve-btn / drawer-reject-btn render at the very bottom of the drawer and are below the viewport on a 1080p screen. Playwright reports \"Element is outside of the viewport\" after scroll-into-view. A real user would have to scroll inside the drawer to reach Approve/Reject, which is not obvious. Consider stickying the action bar to the bottom of the drawer, or shortening the form above.",
+        "selector": "[data-testid=\"drawer-approve-btn\"]",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "Radix Dialog (campaigns add)",
+        "issue": "React console warning: 'Missing Description or aria-describedby={undefined} for {DialogContent}'. Accessibility violation; add a DialogDescription to the Add-campaign dialog.",
+        "selector": "campaign add dialog",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix user-menu dropdown not opening (HIGH). Likely fix: raise z-index of the DropdownMenu trigger / portal above the toast, or set pointer-events:none on the toast container, or dismiss the welcome toast after 2-3 s. Verify by logging in, immediately clicking the avatar — menu must open with Settings + Log out items.",
+    "Make the Approve/Reject action bar in InvoiceDrawer sticky to the bottom so it is always visible.",
+    "Add DialogDescription / aria-describedby to the campaign-add and any other DialogContent components to silence the a11y warning."
+  ],
+  "critical_code_review_comments": [
+    "routes.py: POST /api/campaigns was returning the same dict it just inserted into Mongo (motor's insert_one mutates the dict to add ObjectId _id). Fixed by popping _id before returning. Same anti-pattern should be audited everywhere insert_one's argument is returned — currently only campaigns hit this; invoices upload uses find_one with projection {_id:0} which is correct.",
+    "routes.py: campaigns POST does not validate body shape — it accepts arbitrary dict and spreads into Campaign(**body); a Pydantic model on the body would give clearer 422s for malformed input.",
+    "auth_routes.py /api/auth/google: returns the seeded demo account for ANY caller — fine for demo, but make sure the production deploy disables this or gates it behind a feature flag, otherwise it is an authentication bypass.",
+    "AppLayout: the welcome toast renders without aria-live and visually overlaps the user-menu trigger; consider moving toasts to the bottom-right OR auto-dismissing after 2 s.",
+    "ai_service: extract_invoice_from_file path is never exercised by the seed (real PDF needed). Recommend wrapping the upload route in a clearer error response if the AI extraction returns nothing, so partial invoices aren't silently inserted."
+  ],
+  "updated_files": [
+    "/app/backend/routes.py (fixed ObjectId leak in POST /api/campaigns response)",
+    "/app/backend/tests/backend_test.py (new pytest suite, 25 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (25/25)",
+    "frontend": "85% (11/13)"
+  },
+  "test_credentials": "demo@creatorledger.com / demo1234 (seeded admin). New users registered via /api/auth/register get their own seeded copy of the demo data.",
+  "seed_data_creation": "Used the already-seeded demo workspace (41 invoices, 30 creators, 39 campaigns, 14 flagged). Tests create TEST_-prefixed campaigns and clean them up. Registered ephemeral TEST_user_*@example.com accounts for the new-user-seed test.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest file lives at /app/backend/tests/backend_test.py — run via `python -m pytest backend/tests/backend_test.py -v` from /app. Backend pytest.ini at /app/backend already enables xdist (2 workers). On retest, focus on: (1) the user-menu dropdown opening immediately after login — currently blocked by the welcome toast overlay; (2) Approve/Reject inside the invoice drawer being reachable without manual scroll; (3) any real PDF upload extraction (skipped this iteration). Auth uses httpOnly cookies — use requests.Session() with credentials.",
+  "rca of the issue": "POST /api/campaigns 500 RCA: motor's await db.campaigns.insert_one(doc) mutates doc by adding the BSON ObjectId at doc['_id']. The handler then `return campaign` — FastAPI's jsonable_encoder cannot serialize ObjectId, raising 'ObjectId object is not iterable'. Fix: pop _id before returning. Mitigation everywhere else: always use {_id:0} projection on subsequent find_one or pop _id explicitly. User-menu RCA: Sonner/shadcn toast 'Welcome back to CreatorLedger' renders top-right at the same z-index region as the avatar trigger; even with playwright force-click the Radix trigger never transitions to data-state=\"open\". Most likely the toast container has pointer-events:auto and a higher stacking context than the trigger button."
+}
