@@ -1,0 +1,98 @@
+{
+  "theme": "light",
+  "archetype": "4 (Swiss & High-Contrast) + Premium YC SaaS",
+  "colors": {
+    "background": "#FDFCFB",
+    "surface": "#FFFFFF",
+    "primary": "#0A805D",
+    "primary_hover": "#065F45",
+    "text_main": "#0F172A",
+    "text_muted": "#64748B",
+    "border": "#E2E8F0",
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "destructive": "#E11D48",
+    "accent_bg": "#F0FDF4"
+  },
+  "typography": {
+    "heading_font": "Outfit",
+    "body_font": "Manrope",
+    "h1": "text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tighter text-slate-900 leading-tight",
+    "h2": "text-3xl sm:text-4xl font-medium tracking-tight text-slate-900",
+    "h3": "text-xl sm:text-2xl font-medium text-slate-900 tracking-tight",
+    "body": "text-base text-slate-600 leading-relaxed",
+    "small": "text-sm text-slate-500",
+    "overline": "text-xs font-bold uppercase tracking-[0.2em] text-slate-400"
+  },
+  "spacing": {
+    "section_padding": "py-24 sm:py-32",
+    "container": "max-w-7xl mx-auto px-6 lg:px-8",
+    "card_padding": "p-6 sm:p-8",
+    "gap_standard": "gap-6 sm:gap-8",
+    "gap_loose": "gap-12 sm:gap-16"
+  },
+  "components": {
+    "card": "bg-white border border-slate-200/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] rounded-2xl overflow-hidden",
+    "card_hover": "hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-slate-300 transition-all duration-300 ease-out",
+    "button_primary": "inline-flex items-center justify-center rounded-xl bg-[#0A805D] px-6 py-3 text-sm font-medium text-white hover:bg-[#065F45] transition-colors shadow-sm",
+    "button_secondary": "inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 px-6 py-3 text-sm font-medium text-slate-900 hover:bg-slate-50 transition-colors shadow-sm",
+    "glass_header": "sticky top-0 z-50 w-full bg-white/70 backdrop-blur-xl border-b border-slate-200/50 backdrop-saturate-150",
+    "badge_critical": "inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-600 border border-rose-200",
+    "badge_warning": "inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-600 border border-amber-200",
+    "badge_info": "inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-600 border border-blue-200",
+    "ai_insight_card": "bg-gradient-to-br from-[#F0FDF4] to-white border border-[#0A805D]/20 shadow-sm rounded-2xl p-6"
+  },
+  "animations": {
+    "hover_lift": "transition-transform duration-300 ease-out hover:-translate-y-1",
+    "fade_in_up": "animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out",
+    "staggered_list": "transition-all duration-500 ease-out"
+  },
+  "image_urls": [
+    {
+      "url": "https://images.pexels.com/photos/13219418/pexels-photo-13219418.jpeg",
+      "description": "Modern glass office building facade",
+      "category": "hero_background"
+    },
+    {
+      "url": "https://images.pexels.com/photos/28426641/pexels-photo-28426641.jpeg",
+      "description": "Professional businessman in modern office",
+      "category": "testimonial_portrait_1"
+    },
+    {
+      "url": "https://images.pexels.com/photos/30692588/pexels-photo-30692588.jpeg",
+      "description": "Mature executive in modern office",
+      "category": "testimonial_portrait_2"
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1741463185216-791d4a4f1b2f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwYWJzdHJhY3QlMjBnZW9tZXRyaWMlMjBtb25leXxlbnwwfHx8fDE3ODIwNzM5MDZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Minimalist green abstract geometric graphic",
+      "category": "ai_insights_graphic"
+    },
+    {
+      "url": "https://images.pexels.com/photos/7651555/pexels-photo-7651555.jpeg",
+      "description": "Hand holding invoice document with pen",
+      "category": "problem_section_visual"
+    },
+    {
+      "url": "https://images.pexels.com/photos/7661185/pexels-photo-7661185.jpeg",
+      "description": "Minimalist branding and marketing paper graphic",
+      "category": "feature_marketing_agency"
+    }
+  ],
+  "layout_rules": {
+    "general": "Never center content by default unless in a specific hero layout. Use asymmetrical grids. Emphasize optical alignment.",
+    "dashboard": "Use a tight Bento grid (`gap-6`) for the main analytics. Widgets must span logically (e.g., Main Chart is `col-span-2`, Summary Stats are `col-span-1`). Use `h-full` to align bottoms.",
+    "forms": "Use Shadcn customized components. Inputs should have minimal borders, subtle focus rings (`focus:ring-2 focus:ring-[#0A805D]/20`), and sufficient padding (`p-3`). Do NOT use standard HTML inputs."
+  },
+  "instructions_to_main_agent": [
+    "Load and implement specific fonts: `Outfit` (for all headings) and `Manrope` (for body text). Do NOT use Inter.",
+    "ALL interactive elements (buttons, inputs, links, tabs, table actions) MUST include a `data-testid` attribute using kebab-case role-based naming (e.g., `data-testid=\"login-submit-button\"`). This is a CRITICAL REQUIREMENT.",
+    "Build the Landing Page at the root route `/` and the main application Dashboard at `/dashboard`.",
+    "Install and use `@phosphor-icons/react` for icons. They provide the premium, fine-line duotone look expected of modern SaaS platforms.",
+    "Avoid generic admin dashboard templates. The dashboard must look like a high-end financial tool (Stripe, Ramp, Linear). Use stark whites, subtle gray borders, and Emerald green exclusively for primary actions and positive trends.",
+    "For the AI Reconciliation UI, display 'AI Confidence & Explainability' explicitly. Use the `ai_insight_card` styling for these cards so they stand out positively.",
+    "Ensure severity badges (Critical, Warning, Info) use the provided component guidelines for soft pastel backgrounds with stark foreground colors.",
+    "Ensure you test all responsive layouts. Mobile screens must restrict image heights to max 80vh.",
+    "Use framer-motion for smooth page transitions and list staggering, especially for the invoice reconciliation table to give it a 'live analysis' feel."
+  ]
+}
