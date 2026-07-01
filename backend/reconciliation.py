@@ -1,6 +1,7 @@
 """Deterministic reconciliation engine. AI is used only to write the WHY copy."""
 from __future__ import annotations
 
+import re
 from typing import Dict, List, Optional
 
 from db import get_db
@@ -14,6 +15,8 @@ def _norm(s: str) -> str:
 
 PAN_RE = r"^[A-Z]{5}[0-9]{4}[A-Z]$"
 GSTIN_RE = r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}Z[0-9A-Z]{1}$"
+_PAN_PATTERN = re.compile(PAN_RE)
+_GSTIN_PATTERN = re.compile(GSTIN_RE)
 
 
 def _missing(value: str) -> bool:
@@ -62,7 +65,8 @@ def _detect_anomalies(invoice: dict, campaign: Optional[dict], duplicates: List[
             })
 
     # PAN
-    if _missing(invoice.get("pan")):
+    pan_value = (invoice.get("pan") or "").strip().upper()
+    if _missing(pan_value):
         anomalies.append({
             "code": "MISSING_PAN", "severity": "critical",
             "label": "Missing PAN",
@@ -72,9 +76,21 @@ def _detect_anomalies(invoice: dict, campaign: Optional[dict], duplicates: List[
             "suggestion": "Request PAN from the creator before processing payout.",
             "confidence": 0.99,
         })
+    elif not _PAN_PATTERN.match(pan_value):
+        anomalies.append({
+            "code": "INVALID_PAN_FORMAT", "severity": "critical",
+            "label": "Invalid PAN format",
+            "expected": "AAAAA9999A format PAN (5 letters, 4 digits, 1 letter)",
+            "actual": pan_value,
+            "reason": "The extracted PAN does not match the standard Indian PAN format — likely an OCR/extraction error or an invalid PAN.",
+            "suggestion": "Re-check the invoice and re-enter the PAN manually before approving.",
+            "confidence": 0.9,
+        })
 
     # GSTIN (only flag as info when amount is high)
-    if _missing(invoice.get("gstin")) and float(invoice.get("gross_amount") or 0) > 25000:
+    gstin_value = (invoice.get("gstin") or "").strip().upper()
+    gross_amount = float(invoice.get("gross_amount") or 0)
+    if _missing(gstin_value) and gross_amount > 25000:
         anomalies.append({
             "code": "MISSING_GSTIN", "severity": "warning",
             "label": "Missing GSTIN",
@@ -83,6 +99,16 @@ def _detect_anomalies(invoice: dict, campaign: Optional[dict], duplicates: List[
             "reason": "Invoice over ₹25,000 without a GSTIN — possible compliance issue.",
             "suggestion": "Ask the creator if they are GST-registered.",
             "confidence": 0.85,
+        })
+    elif not _missing(gstin_value) and not _GSTIN_PATTERN.match(gstin_value):
+        anomalies.append({
+            "code": "INVALID_GSTIN_FORMAT", "severity": "warning",
+            "label": "Invalid GSTIN format",
+            "expected": "15-character GSTIN (2-digit state code + 10-char PAN + entity/check digits)",
+            "actual": gstin_value,
+            "reason": "The extracted GSTIN does not match the standard 15-character GSTIN format — likely an OCR/extraction error or an invalid GSTIN.",
+            "suggestion": "Re-check the invoice and re-enter the GSTIN manually before approving.",
+            "confidence": 0.88,
         })
 
     # Bank details
