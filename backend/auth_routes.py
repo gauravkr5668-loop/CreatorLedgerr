@@ -10,6 +10,7 @@ from auth import (
     JWT_ALGORITHM, ACCESS_TOKEN_MINUTES, COOKIE_SECURE,
 )
 from models import UserRegister, UserLogin, UserPublic, new_id
+from rate_limit import limiter
 import jwt
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -55,7 +56,8 @@ async def register(body: UserRegister, response: Response):
 
 
 @router.post("/login")
-async def login(body: UserLogin, response: Response):
+@limiter.limit("5/minute")
+async def login(request: Request, body: UserLogin, response: Response):
     db = get_db()
     email = body.email.lower().strip()
     user = await db.users.find_one({"email": email})

@@ -10,8 +10,12 @@ import os
 
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from db import get_db, close_db
+from rate_limit import limiter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +24,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CreatorLedger API")
+
+# Rate limiting — protects /api/auth/login from brute-force credential guessing and
+# /api/invoices/upload from being hammered to run up LLM extraction costs.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 @app.on_event("startup")

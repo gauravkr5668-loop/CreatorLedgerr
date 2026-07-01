@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 
 from db import get_db
@@ -21,6 +21,7 @@ from models import (
 )
 from reconciliation import reconcile_all, reconcile_invoice
 from ai_service import extract_invoice_from_file, gpt52_dashboard_insights
+from rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +255,9 @@ async def reject_invoice(invoice_id: str, user: dict = Depends(get_current_user)
 
 
 @router.post("/invoices/upload")
+@limiter.limit("10/minute")
 async def upload_invoices(
+    request: Request,
     files: List[UploadFile] = File(...),
     user: dict = Depends(get_current_user),
 ):
