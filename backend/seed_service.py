@@ -2,6 +2,7 @@
 with 12 intentional discrepancies so the dashboard immediately looks alive."""
 from __future__ import annotations
 
+import logging
 import random
 from datetime import datetime, timezone, timedelta
 from typing import List
@@ -10,6 +11,7 @@ from db import get_db
 from models import Campaign, Invoice, LineItem, FinanceSettings, new_id, utcnow_iso
 from reconciliation import reconcile_all
 
+logger = logging.getLogger(__name__)
 random.seed(0xC1ED6E5)  # deterministic for demo
 
 CREATORS = [
@@ -252,8 +254,22 @@ async def ensure_admin_user_seeded():
     from auth import hash_password
 
     db = get_db()
+    demo_mode = os.environ.get("DEMO_MODE", "false").lower() == "true"
     email = os.environ.get("ADMIN_EMAIL", "demo@creatorledger.com")
-    password = os.environ.get("ADMIN_PASSWORD", "demo1234")
+    password = os.environ.get("ADMIN_PASSWORD")
+    if not password:
+        if not demo_mode:
+            logger.warning(
+                "ADMIN_PASSWORD is not set and DEMO_MODE is not 'true' — skipping "
+                "demo admin account seeding. Set ADMIN_PASSWORD explicitly, or set "
+                "DEMO_MODE=true to use the demo default for local/contest use only."
+            )
+            return
+        logger.warning(
+            "ADMIN_PASSWORD not set; falling back to the well-known demo password "
+            "because DEMO_MODE=true. Never run with DEMO_MODE=true in production."
+        )
+        password = "demo1234"
     existing = await db.users.find_one({"email": email})
     if existing is None:
         user_id = new_id()

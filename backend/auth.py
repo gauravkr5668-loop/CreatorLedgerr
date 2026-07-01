@@ -13,6 +13,11 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 60 * 24  # 1 day for demo convenience
 REFRESH_TOKEN_DAYS = 7
 
+# Cookies must be Secure (HTTPS-only) in any real deployment. Default to True and
+# require an explicit opt-out for local HTTP dev, so production never accidentally
+# ships insecure cookies just because nobody set the env var.
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() != "false"
+
 
 def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
@@ -51,11 +56,11 @@ def create_refresh_token(user_id: str) -> str:
 
 def set_auth_cookies(response, access_token: str, refresh_token: str):
     response.set_cookie(
-        key="access_token", value=access_token, httponly=True, secure=False,
+        key="access_token", value=access_token, httponly=True, secure=COOKIE_SECURE,
         samesite="lax", max_age=ACCESS_TOKEN_MINUTES * 60, path="/",
     )
     response.set_cookie(
-        key="refresh_token", value=refresh_token, httponly=True, secure=False,
+        key="refresh_token", value=refresh_token, httponly=True, secure=COOKIE_SECURE,
         samesite="lax", max_age=REFRESH_TOKEN_DAYS * 86400, path="/",
     )
 

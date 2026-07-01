@@ -7,7 +7,7 @@ from db import get_db
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     set_auth_cookies, clear_auth_cookies, get_current_user, get_jwt_secret,
-    JWT_ALGORITHM,
+    JWT_ALGORITHM, ACCESS_TOKEN_MINUTES, COOKIE_SECURE,
 )
 from models import UserRegister, UserLogin, UserPublic, new_id
 import jwt
@@ -79,7 +79,14 @@ async def login(body: UserLogin, response: Response):
 async def google_demo(response: Response):
     """Demo Google sign-in — logs the user into the shared demo account
     (real Google OAuth can be wired later). Lets reviewers click 'Continue with Google'
-    and instantly land in a populated dashboard."""
+    and instantly land in a populated dashboard.
+
+    SECURITY: this performs no actual verification — it is an open login to a shared
+    account. It only runs when DEMO_MODE=true. Before onboarding real customers, either
+    remove this route or replace it with real Google OAuth (verify the id_token server-side).
+    """
+    if os.environ.get("DEMO_MODE", "false").lower() != "true":
+        raise HTTPException(status_code=404, detail="Not found")
     db = get_db()
     demo_email = os.environ.get("ADMIN_EMAIL", "demo@creatorledger.com")
     user = await db.users.find_one({"email": demo_email})
@@ -120,7 +127,7 @@ async def refresh_token(request: Request, response: Response):
         raise HTTPException(status_code=401, detail="User not found")
     access = create_access_token(user["id"], user["email"])
     response.set_cookie(
-        key="access_token", value=access, httponly=True, secure=False,
-        samesite="lax", max_age=60 * 60 * 24, path="/",
+        key="access_token", value=access, httponly=True, secure=COOKIE_SECURE,
+        samesite="lax", max_age=ACCESS_TOKEN_MINUTES * 60, path="/",
     )
     return {"ok": True}

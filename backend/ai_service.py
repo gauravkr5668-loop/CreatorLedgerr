@@ -14,9 +14,17 @@ import os
 import re
 from typing import Any, Dict, List
 
-from emergentintegrations.llm.chat import (
-    LlmChat, UserMessage, FileContentWithMimeType,
-)
+try:
+    from emergentintegrations.llm.chat import (
+        LlmChat, UserMessage, FileContentWithMimeType,
+    )
+    _LLM_AVAILABLE = True
+except ImportError:
+    _LLM_AVAILABLE = False
+    logging.getLogger(__name__).warning(
+        "emergentintegrations not installed — AI extraction/insights are disabled. "
+        "This is expected in local dev; wire up a direct provider SDK before production."
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +87,11 @@ def _strip_json(text: str) -> str:
 
 async def extract_invoice_from_file(file_path: str, mime_type: str) -> Dict[str, Any]:
     """Run Gemini 3 Flash to extract a structured invoice JSON from a file."""
+    if not _LLM_AVAILABLE:
+        raise RuntimeError(
+            "AI extraction is unavailable: emergentintegrations is not installed. "
+            "Install it (private package) or wire up a direct provider SDK."
+        )
     if not EMERGENT_KEY:
         raise RuntimeError("EMERGENT_LLM_KEY not configured")
 

@@ -55,15 +55,21 @@ async def health():
     return {"status": "ok", "service": "creatorledger"}
 
 
-# CORS: allow the deployed frontend + local dev. allow_credentials needs explicit origin (or wildcard with no credentials).
-cors_origins_env = os.environ.get("CORS_ORIGINS", "*")
+# CORS: we use httpOnly cookies (allow_credentials=True), so origins MUST be an explicit
+# allowlist. A wildcard regex + credentials lets ANY website read authenticated responses
+# on behalf of a logged-in user — never combine those two, even for a demo.
+cors_origins_env = os.environ.get("CORS_ORIGINS", "")
 allow_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
-# wildcard is okay for the demo since we also support Authorization header
+if not allow_origins:
+    logger.warning(
+        "CORS_ORIGINS is not set — no cross-origin requests will be allowed. "
+        "Set CORS_ORIGINS to a comma-separated list of exact frontend origins "
+        "(e.g. https://app.creatorledger.com), never '*'."
+    )
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=allow_origins if allow_origins != ["*"] else [],
-    allow_origin_regex=".*" if allow_origins == ["*"] else None,
+    allow_origins=allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
