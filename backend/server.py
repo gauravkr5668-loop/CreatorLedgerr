@@ -8,7 +8,8 @@ load_dotenv(ROOT_DIR / ".env")
 import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -30,6 +31,16 @@ app = FastAPI(title="CreatorLedger API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+
+# Catch-all for anything not already handled (e.g. by FastAPI's own HTTPException
+# handler, or the RateLimitExceeded handler above). Without this, an unexpected
+# error (bad DB query, bug, etc.) can surface its full Python traceback to the
+# client. This logs the traceback server-side and always returns a generic 500.
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.on_event("startup")

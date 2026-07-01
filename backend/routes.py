@@ -5,6 +5,7 @@ import csv
 import io
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -199,13 +200,14 @@ async def list_invoices(
     if status and status != "all":
         query["status"] = status
     if campaign:
-        query["campaign_reference"] = {"$regex": campaign, "$options": "i"}
+        query["campaign_reference"] = {"$regex": re.escape(campaign), "$options": "i"}
     if q:
+        q_esc = re.escape(q)
         query["$or"] = [
-            {"creator_name": {"$regex": q, "$options": "i"}},
-            {"invoice_number": {"$regex": q, "$options": "i"}},
-            {"pan": {"$regex": q, "$options": "i"}},
-            {"campaign_reference": {"$regex": q, "$options": "i"}},
+            {"creator_name": {"$regex": q_esc, "$options": "i"}},
+            {"invoice_number": {"$regex": q_esc, "$options": "i"}},
+            {"pan": {"$regex": q_esc, "$options": "i"}},
+            {"campaign_reference": {"$regex": q_esc, "$options": "i"}},
         ]
     rows = await db.invoices.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
     if severity and severity != "all":
@@ -535,7 +537,7 @@ async def global_search(q: str, user: dict = Depends(get_current_user)):
     if not q.strip():
         return {"creators": [], "campaigns": [], "invoices": []}
     db = get_db()
-    qreg = {"$regex": q, "$options": "i"}
+    qreg = {"$regex": re.escape(q), "$options": "i"}
     invs = await db.invoices.find(
         {"user_id": user["id"], "$or": [
             {"creator_name": qreg}, {"invoice_number": qreg}, {"pan": qreg}, {"campaign_reference": qreg},
