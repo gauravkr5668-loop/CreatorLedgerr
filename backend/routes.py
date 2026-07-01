@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from db import get_db
 from auth import get_current_user
 from models import (
-    Campaign, Invoice, InvoiceUpdate, FinanceSettings,
+    CampaignBase, Campaign, Invoice, InvoiceUpdate, FinanceSettings,
     FinanceSettingsUpdate, new_id, utcnow_iso,
 )
 from reconciliation import reconcile_all, reconcile_invoice
@@ -104,9 +104,9 @@ async def list_campaigns(user: dict = Depends(get_current_user)):
 
 
 @router.post("/campaigns")
-async def create_campaign(body: dict, user: dict = Depends(get_current_user)):
+async def create_campaign(body: CampaignBase, user: dict = Depends(get_current_user)):
     db = get_db()
-    campaign = Campaign(user_id=user["id"], **body).model_dump()
+    campaign = Campaign(user_id=user["id"], **body.model_dump()).model_dump()
     await db.campaigns.insert_one(campaign)
     # reconcile invoices after adding a campaign
     await reconcile_all(user["id"], use_llm_explanations=False)
