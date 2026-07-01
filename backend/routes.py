@@ -36,6 +36,27 @@ ALLOWED_INVOICE_MIME = {
     "image/jpg": ".jpg",
 }
 
+# Max size per uploaded invoice file. The client-declared Content-Type header is
+# trivially spoofable, so we also verify real file type by magic bytes below.
+MAX_INVOICE_FILE_SIZE = int(os.environ.get("MAX_INVOICE_FILE_SIZE_BYTES", 15 * 1024 * 1024))  # 15MB default
+
+# Known file signatures ("magic bytes") for each type we accept. We check the actual
+# bytes on disk against these rather than trusting the client's Content-Type header.
+_FILE_SIGNATURES = {
+    ".pdf": [b"%PDF-"],
+    ".png": [b"\x89PNG\r\n\x1a\n"],
+    ".jpg": [b"\xff\xd8\xff"],
+}
+
+
+def _sniff_extension(content: bytes) -> Optional[str]:
+    """Return the extension implied by the file's actual magic bytes, or None if unrecognised."""
+    for ext, signatures in _FILE_SIGNATURES.items():
+        for sig in signatures:
+            if content.startswith(sig):
+                return ext
+    return None
+
 
 # ---------- Dashboard summary ----------
 @router.get("/dashboard/summary")
@@ -101,6 +122,11 @@ async def delete_campaign(campaign_id: str, user: dict = Depends(get_current_use
     return {"ok": True}
 
 
+# Campaign sheets are small structured data; cap generously above what a real agency
+# spreadsheet would need, to block accidental or malicious oversized uploads.
+MAX_CAMPAIGN_FILE_SIZE = int(os.environ.get("MAX_CAMPAIGN_FILE_SIZE_BYTES", 10 * 1024 * 1024))  # 10MB default
+
+
 @router.post("/campaigns/upload")
 async def upload_campaigns_excel(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
     """Upload an Excel/CSV with campaign master data. Expected columns
@@ -109,7 +135,15 @@ async def upload_campaigns_excel(file: UploadFile = File(...), user: dict = Depe
     expected_gst, expected_payment, campaign_manager.
     """
     name = (file.filename or "").lower()
-    content = await file.read()
+    if not name.endswith((".xlsx", ".xls", ".csv")):
+        raise HTTPException(400, "Unsupported file type — upload an .xlsx, .xls, or .csv file")
+
+    content = await file.read(MAX_CAMPAIGN_FILE_SIZE + 1)
+    if len(content) > MAX_CAMPAIGN_FILE_SIZE:
+        raise HTTPException(400, f"File exceeds the {MAX_CAMPAIGN_FILE_SIZE // (1024*1024)}MB upload limit")
+    if not content:
+        raise HTTPException(400, "Empty file")
+
     try:
         if name.endswith((".xlsx", ".xls")):
             df = pd.read_excel(io.BytesIO(content))
@@ -232,8 +266,41 @@ async def upload_invoices(
             results.append({"file": f.filename, "ok": False, "error": f"Unsupported file type: {mime}"})
             continue
         ext = ALLOWED_INVOICE_MIME[mime]
+
+        # Read with a hard cap so a single oversized file can't exhaust memory/disk/LLM cost.
+        chunks = []
+        total = 0
+        too_large = False
+        while True:
+            chunk = await f.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_INVOICE_FILE_SIZE:
+                too_large = True
+                break
+            chunks.append(chunk)
+        if too_large:
+            results.append({
+                "file": f.filename, "ok": False,
+                "error": f"File exceeds the {MAX_INVOICE_FILE_SIZE // (1024*1024)}MB upload limit",
+            })
+            continue
+        content = b"".join(chunks)
+        if not content:
+            results.append({"file": f.filename, "ok": False, "error": "Empty file"})
+            continue
+
+        # Verify the file's real bytes match what it claims to be.
+        sniffed_ext = _sniff_extension(content)
+        if sniffed_ext is None or sniffed_ext != ext:
+            results.append({
+                "file": f.filename, "ok": False,
+                "error": "File content does not match its declared type",
+            })
+            continue
+
         local_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}{ext}")
-        content = await f.read()
         with open(local_path, "wb") as fp:
             fp.write(content)
 
