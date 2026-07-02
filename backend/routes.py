@@ -1,6 +1,7 @@
 """Main application routes: campaigns, invoices, reconciliation, insights, export."""
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import logging
@@ -256,69 +257,24 @@ async def reject_invoice(invoice_id: str, user: dict = Depends(get_current_user)
     return await update_invoice(invoice_id, InvoiceUpdate(status="rejected"), user)
 
 
-@router.post("/invoices/upload")
-@limiter.limit("10/minute")
-async def upload_invoices(
-    request: Request,
-    files: List[UploadFile] = File(...),
-    user: dict = Depends(get_current_user),
-):
-    db = get_db()
-    results = []
-    for f in files:
-        mime = (f.content_type or "").lower()
-        if mime not in ALLOWED_INVOICE_MIME:
-            results.append({"file": f.filename, "ok": False, "error": f"Unsupported file type: {mime}"})
-            continue
-        ext = ALLOWED_INVOICE_MIME[mime]
+MAX_CONCURRENT_EXTRACTIONS = int(os.environ.get("MAX_CONCURRENT_INVOICE_EXTRACTIONS", "5"))
 
-        # Read with a hard cap so a single oversized file can't exhaust memory/disk/LLM cost.
-        chunks = []
-        total = 0
-        too_large = False
-        while True:
-            chunk = await f.read(1024 * 1024)
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > MAX_INVOICE_FILE_SIZE:
-                too_large = True
-                break
-            chunks.append(chunk)
-        if too_large:
-            results.append({
-                "file": f.filename, "ok": False,
-                "error": f"File exceeds the {MAX_INVOICE_FILE_SIZE // (1024*1024)}MB upload limit",
-            })
-            continue
-        content = b"".join(chunks)
-        if not content:
-            results.append({"file": f.filename, "ok": False, "error": "Empty file"})
-            continue
 
-        # Verify the file's real bytes match what it claims to be.
-        sniffed_ext = _sniff_extension(content)
-        if sniffed_ext is None or sniffed_ext != ext:
-            results.append({
-                "file": f.filename, "ok": False,
-                "error": "File content does not match its declared type",
-            })
-            continue
-
-        local_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}{ext}")
-        with open(local_path, "wb") as fp:
-            fp.write(content)
-
+async def _extract_and_insert(local_path: str, mime: str, filename: str, user_id: str,
+                               db, semaphore: asyncio.Semaphore) -> dict:
+    """Extraction + insert only — no reconciliation yet. Reconciliation runs as a separate
+    pass (see _reconcile_and_fetch) after every file in the batch has been inserted, so
+    duplicate-detection can see the *whole* batch instead of only files inserted earlier."""
+    async with semaphore:
         try:
             extracted = await extract_invoice_from_file(local_path, mime)
         except Exception as e:
-            logger.exception("Extraction failed for %s", f.filename)
-            results.append({"file": f.filename, "ok": False, "error": str(e)})
-            continue
+            logger.exception("Extraction failed for %s", filename)
+            return {"file": filename, "ok": False, "error": str(e)}
 
         inv = Invoice(
-            user_id=user["id"],
-            file_name=f.filename or os.path.basename(local_path),
+            user_id=user_id,
+            file_name=filename,
             creator_name=str(extracted.get("creator_name") or ""),
             invoice_number=str(extracted.get("invoice_number") or ""),
             invoice_date=str(extracted.get("invoice_date") or ""),
@@ -337,10 +293,104 @@ async def upload_invoices(
             confidence_score=float(extracted.get("confidence_score") or 0.85),
         ).model_dump()
         await db.invoices.insert_one(inv)
-        # Reconcile (with LLM reasoning for these freshly uploaded files)
-        await reconcile_invoice(user["id"], inv["id"], use_llm_explanations=True)
-        fresh = await db.invoices.find_one({"id": inv["id"]}, {"_id": 0})
-        results.append({"file": f.filename, "ok": True, "invoice": fresh})
+        return {"file": filename, "ok": True, "invoice_id": inv["id"]}
+
+
+async def _reconcile_and_fetch(user_id: str, invoice_id: str, filename: str,
+                                db, semaphore: asyncio.Semaphore) -> dict:
+    """Reconcile (with LLM reasoning) now that the whole batch is inserted, then return the
+    invoice with its final discrepancies."""
+    async with semaphore:
+        await reconcile_invoice(user_id, invoice_id, use_llm_explanations=True)
+        fresh = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+        return {"file": filename, "ok": True, "invoice": fresh}
+
+
+@router.post("/invoices/upload")
+@limiter.limit("10/minute")
+async def upload_invoices(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    user: dict = Depends(get_current_user),
+):
+    db = get_db()
+    results: List[Optional[dict]] = [None] * len(files)
+
+    # Phase 1: validate + save to disk. Cheap and fast — kept sequential since it's not
+    # the bottleneck (the LLM calls in phase 2 are).
+    pending = []  # (index, local_path, mime, filename)
+    for idx, f in enumerate(files):
+        mime = (f.content_type or "").lower()
+        if mime not in ALLOWED_INVOICE_MIME:
+            results[idx] = {"file": f.filename, "ok": False, "error": f"Unsupported file type: {mime}"}
+            continue
+        ext = ALLOWED_INVOICE_MIME[mime]
+
+        # Read with a hard cap so a single oversized file can't exhaust memory/disk/LLM cost.
+        chunks = []
+        total = 0
+        too_large = False
+        while True:
+            chunk = await f.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_INVOICE_FILE_SIZE:
+                too_large = True
+                break
+            chunks.append(chunk)
+        if too_large:
+            results[idx] = {
+                "file": f.filename, "ok": False,
+                "error": f"File exceeds the {MAX_INVOICE_FILE_SIZE // (1024*1024)}MB upload limit",
+            }
+            continue
+        content = b"".join(chunks)
+        if not content:
+            results[idx] = {"file": f.filename, "ok": False, "error": "Empty file"}
+            continue
+
+        # Verify the file's real bytes match what it claims to be.
+        sniffed_ext = _sniff_extension(content)
+        if sniffed_ext is None or sniffed_ext != ext:
+            results[idx] = {
+                "file": f.filename, "ok": False,
+                "error": "File content does not match its declared type",
+            }
+            continue
+
+        local_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}{ext}")
+        with open(local_path, "wb") as fp:
+            fp.write(content)
+
+        pending.append((idx, local_path, mime, f.filename or os.path.basename(local_path)))
+
+    # Phase 2: LLM extraction + insert, concurrently (bounded by MAX_CONCURRENT_EXTRACTIONS)
+    # instead of one file at a time. This is the step that used to make bulk uploads time out.
+    extract_by_idx: dict = {}
+    if pending:
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXTRACTIONS)
+        extracted_list = await asyncio.gather(*[
+            _extract_and_insert(local_path, mime, filename, user["id"], db, semaphore)
+            for (_, local_path, mime, filename) in pending
+        ])
+        for (idx, *_rest), res in zip(pending, extracted_list):
+            extract_by_idx[idx] = res
+            if not res.get("ok"):
+                results[idx] = res
+
+    # Phase 3: reconcile every newly-inserted invoice, also concurrently. Runs only after
+    # phase 2 fully completes, so duplicate-detection sees the entire batch, not just
+    # whichever files happened to be inserted earlier.
+    to_reconcile = [(idx, res["invoice_id"], res["file"]) for idx, res in extract_by_idx.items() if res.get("ok")]
+    if to_reconcile:
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXTRACTIONS)
+        reconciled_list = await asyncio.gather(*[
+            _reconcile_and_fetch(user["id"], invoice_id, filename, db, semaphore)
+            for (_, invoice_id, filename) in to_reconcile
+        ])
+        for (idx, _invoice_id, _filename), res in zip(to_reconcile, reconciled_list):
+            results[idx] = res
 
     return {"results": results}
 
